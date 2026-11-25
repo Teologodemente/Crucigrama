@@ -1,0 +1,967 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>✝️ Crucigrama Bíblico</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  :root {
+    --gold: #f5b942;
+    --gold-dark: #d99a1f;
+    --bg1: #0f172a;
+    --bg2: #1e1b4b;
+    --panel: rgba(255,255,255,0.06);
+    --cell: #fffdf5;
+    --ink: #1e293b;
+  }
+  body {
+    font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+    background: radial-gradient(1200px 800px at 20% -10%, #312e81 0%, var(--bg2) 40%, var(--bg1) 100%);
+    min-height: 100vh;
+    color: #e2e8f0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px 12px 60px;
+  }
+  header { text-align: center; margin-bottom: 14px; }
+  h1 {
+    font-size: clamp(1.6rem, 4.5vw, 2.4rem);
+    background: linear-gradient(90deg, #fcd34d, #f59e0b, #fcd34d);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    letter-spacing: 1px;
+  }
+  .subtitle { color: #94a3b8; font-size: .95rem; margin-top: 6px; }
+
+  .toolbar {
+    display: flex; flex-wrap: wrap; gap: 10px;
+    justify-content: center; margin: 16px 0;
+  }
+  button {
+    border: none; cursor: pointer;
+    font-size: .95rem; font-weight: 700;
+    padding: 10px 18px; border-radius: 999px;
+    color: #1e1b4b;
+    background: linear-gradient(180deg, #fcd34d, #f59e0b);
+    box-shadow: 0 4px 14px rgba(245,158,11,.35);
+    transition: transform .12s ease, box-shadow .12s ease, filter .12s;
+    touch-action: manipulation;
+  }
+  button:hover { transform: translateY(-2px); filter: brightness(1.05); }
+  button:active { transform: translateY(0); }
+  button.secondary {
+    background: rgba(255,255,255,.1);
+    color: #e2e8f0;
+    border: 1px solid rgba(255,255,255,.2);
+    box-shadow: none;
+  }
+  button:disabled { opacity:.45; cursor:not-allowed; transform:none; }
+
+  .statusbar {
+    display:flex; gap:18px; flex-wrap:wrap; justify-content:center;
+    font-size:.9rem; color:#cbd5e1; margin-bottom:14px;
+  }
+  .statusbar b { color: var(--gold); }
+
+  .board-wrap {
+    background: var(--panel);
+    border: 1px solid rgba(255,255,255,.12);
+    border-radius: 16px;
+    padding: clamp(8px, 2vw, 18px);
+    box-shadow: 0 20px 50px rgba(0,0,0,.4);
+    max-width: 100%;
+    overflow-x: auto;
+  }
+  #board {
+    display: grid;
+    width: min(92vw, 560px);
+    background: transparent;
+  }
+  .cell {
+    position: relative;
+    aspect-ratio: 1;
+    background: var(--cell);
+    border: 1px solid #475569;
+  }
+  .cell.empty { background: rgba(2,6,23,.55); }
+  #board { user-select: none; -webkit-user-select: none; touch-action: manipulation; }
+  .cell { touch-action: manipulation; }
+  .cell .num {
+    position: absolute; top: 1px; left: 3px;
+    font-size: clamp(7px, 1.4vw, 10px);
+    font-weight: 800; color: #64748b;
+    line-height: 1; pointer-events: none;
+  }
+  .cell input {
+    width: 100%; height: 100%;
+    border: none; outline: none; background: transparent;
+    text-align: center; text-transform: uppercase;
+    font-weight: 800;
+    /* mínimo 16px: evita que iOS haga zoom automático al enfocar el input */
+    font-size: clamp(16px, 4.2vw, 26px);
+    color: var(--ink);
+    caret-color: #d97706;
+  }
+  .cell.active-word { background: #fef3c7; }
+  .cell.selected { box-shadow: inset 0 0 0 3px #f59e0b; background:#fde68a; }
+  .cell.wrong { background: #fecaca; animation: shake .4s; }
+  .cell.hinted { background: #bbf7d0; }
+  body.erasing .cell:not(.empty) { cursor: crosshair; }
+  body.erasing .cell:not(.empty)::after {
+    content: '✕'; position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    color: rgba(220,38,38,.4); font-weight: 800;
+    font-size: clamp(10px, 3vw, 20px); pointer-events: none;
+  }
+  button.eraser-on { background: linear-gradient(180deg, #fca5a5, #ef4444); color: #fff; }
+  @keyframes shake {
+    0%,100% { transform: translateX(0); }
+    25% { transform: translateX(-3px); }
+    75% { transform: translateX(3px); }
+  }
+
+  .clues-panel {
+    margin-top: 22px;
+    width: min(92vw, 560px);
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+  }
+  @media (max-width: 560px) { .clues-panel { grid-template-columns: 1fr; } }
+  .clue-col {
+    background: var(--panel);
+    border: 1px solid rgba(255,255,255,.12);
+    border-radius: 14px;
+    padding: 14px 16px;
+  }
+  .clue-col h3 {
+    color: var(--gold);
+    font-size: 1rem; margin-bottom: 10px;
+    letter-spacing: .5px;
+    border-bottom: 1px solid rgba(255,255,255,.15);
+    padding-bottom: 6px;
+  }
+  .clue { font-size: .87rem; line-height: 1.45; margin-bottom: 8px; color: #cbd5e1; cursor: pointer; border-radius: 6px; padding: 2px 6px; transition: background .15s; }
+  .clue:hover { background: rgba(255,255,255,.08); }
+  .clue.active { background: rgba(245,158,11,.2); }
+  .clue .ref { color: #7c8ba5; font-size: .72rem; font-style: italic; }
+  .clue .n {
+    display:inline-block; min-width: 1.5em;
+    color: var(--gold); font-weight: 800;
+  }
+  .clue.done .txt { text-decoration: line-through; opacity: .5; }
+
+  #overlay {
+    position: fixed; inset: 0;
+    background: rgba(2,6,23,.8);
+    display: none;
+    align-items: center; justify-content: center;
+    z-index: 50; padding: 20px;
+  }
+  #overlay.show { display: flex; }
+  .modal {
+    background: linear-gradient(160deg, #1e293b, #1e1b4b);
+    border: 1px solid rgba(255,255,255,.2);
+    border-radius: 20px;
+    padding: 34px 30px;
+    text-align: center;
+    max-width: 400px;
+    box-shadow: 0 30px 80px rgba(0,0,0,.6);
+    animation: pop .3s ease;
+  }
+  @keyframes pop { from { transform: scale(.85); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+  .modal .big { font-size: 3rem; margin-bottom: 10px; }
+  .modal h2 { color: var(--gold); margin-bottom: 10px; font-size: 1.5rem; }
+  .modal p { color: #cbd5e1; margin-bottom: 20px; line-height: 1.5; }
+  #confetti { position: fixed; inset: 0; pointer-events: none; z-index: 60; }
+
+  .tip { margin-top: 16px; font-size: .8rem; color: #64748b; text-align: center; max-width: 560px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>✝️ Crucigrama Bíblico</h1>
+  <p class="subtitle">Un nuevo desafío con cada partida — nunca es el mismo</p>
+</header>
+
+<div class="toolbar">
+  <button id="btnNew">🎲 Nueva partida</button>
+  <button id="btnCheck" class="secondary">✔️ Comprobar</button>
+  <button id="btnHint" class="secondary">💡 Pista</button>
+  <button id="btnReveal" class="secondary">👁️ Revelar</button>
+  <button id="btnDir" class="secondary">↔️ Cambiar ↔/↕</button>
+  <button id="btnErase" class="secondary">🧹 Borrador</button>
+</div>
+
+<div class="statusbar">
+  <span>⏱️ Tiempo: <b id="time">00:00</b></span>
+  <span>📝 Palabras: <b id="progress">0/0</b></span>
+  <span>🔤 Pistas usadas: <b id="hints">0</b></span>
+  <span>🧭 Modo: <b id="mode">↔ Horizontales</b></span>
+</div>
+
+<div class="board-wrap"><div id="board"></div></div>
+
+<div class="clues-panel">
+  <div class="clue-col"><h3>↔️ Horizontales</h3><div id="across"></div></div>
+  <div class="clue-col"><h3>↕️ Verticales</h3><div id="down"></div></div>
+</div>
+
+<p class="tip">⌨️ Escribe en la casilla seleccionada · <b>Espacio</b> cambia ↔/↕ · <b>Backspace</b> borra la casilla (o retrocede y borra) · <b>Shift+Backspace</b> borra toda la línea activa · <b>🧹 Borrador</b> borra al tocar cada casilla · haz <b>clic en una pista</b> para saltar a su palabra. ¡Completa el tablero para ganar! 🏆</p>
+
+<div id="overlay">
+  <div class="modal">
+    <div class="big" id="mIcon">🎉</div>
+    <h2 id="mTitle">¡Lo lograste!</h2>
+    <p id="mText"></p>
+    <button id="mBtn">🎲 Nueva partida</button>
+  </div>
+</div>
+<canvas id="confetti"></canvas>
+
+<script>
+"use strict";
+
+/* ══════════════════ POOL DE PALABRAS ══════════════════
+   Cada respuesta usa solo A-Z (sin tildes ni Ñ) y se define como
+     PALABRA: { c: 'pista', r: 'referencia bíblica' }
+   REGLA DE CALIDAD: la pista NUNCA contiene la palabra a adivinar.  */
+const WORDS = {
+
+  // ─── PERSONAS ───
+  MOISES: { c: "Sacó al pueblo de la esclavitud y partió el mar en dos", r: "Ex 14" },
+  JOSUE: { c: "Sucedió a su maestro y declaró: yo y mi casa serviremos a Dios", r: "Jos 24:15" },
+  DAVID: { c: "Venció a un gigante con una honda y cinco piedras del arroyo", r: "1 S 17" },
+  SALOMON: { c: "Resolvió el pleito de dos madres que decían ser de un mismo niño", r: "1 R 3:16-28" },
+  PEDRO: { c: "Caminó sobre las aguas y negó tres veces antes del canto del gallo", r: "Mt 14:29" },
+  PABLO: { c: "Quedó ciego por una luz en el camino a Damasco", r: "Hch 9:3-6" },
+  JONAS: { c: "Pasó tres días en el vientre de un gran pez", r: "Jon 1:17" },
+  ELIAS: { c: "Desafió a los profetas de Baal en el monte Carmelo", r: "1 R 18" },
+  NOE: { c: "Recibió el encargo de construir un refugio flotante de madera", r: "Gn 6:14" },
+  ABRAHAM: { c: "Salió de su tierra rumbo a una promesa sin saber a dónde iba", r: "Gn 12:1" },
+  ISAAC: { c: "Su padre levantó el cuchillo sobre él en el monte Moriah", r: "Gn 22" },
+  JACOB: { c: "Soñó una escalera que tocaba el cielo y luchó toda la noche", r: "Gn 28:12" },
+  JOSE: { c: "Interpretó los sueños del faraón y administró el granero de Egipto", r: "Gn 41" },
+  JESUS: { c: "Calmó la tempestad y resucitó al tercer día", r: "Mc 4:39" },
+  MARIA: { c: "Dijo al mensajero celestial: hágase en mí según tu palabra", r: "Lc 1:38" },
+  JUAN: { c: "El discípulo que se recostó sobre el pecho del Maestro", r: "Jn 13:23" },
+  SAMUEL: { c: "Siendo niño oyó su nombre en la noche junto al arca", r: "1 S 3" },
+  SARA: { c: "Se rió al escuchar que tendría un hijo en su vejez", r: "Gn 18:12" },
+  REBECA: { c: "Dio de beber a un siervo y a todos sus camellos junto al pozo", r: "Gn 24" },
+  RAQUEL: { c: "Su enamorado trabajó catorce años por ella", r: "Gn 29:20" },
+  TOMAS: { c: "Quiso meter el dedo en las señales de los clavos", r: "Jn 20:25" },
+  ANDRES: { c: "Trajo a su propio hermano Simón ante el Ungido", r: "Jn 1:41-42" },
+  ESTEBAN: { c: "Fue apedreado mientras veía el cielo abierto", r: "Hch 7:59-60" },
+  NICODEMO: { c: "Llegó de noche a preguntar cómo se puede nacer de nuevo", r: "Jn 3:1-2" },
+  HERODES: { c: "Temió al recién nacido y mandó matar a los niños de Belén", r: "Mt 2:16" },
+  ZAQUEO: { c: "De baja estatura, trepó a un sicómoro para ver pasar al Maestro", r: "Lc 19:4" },
+  DEBORA: { c: "Jueza y profetisa que animó a Barac a salir a la batalla", r: "Jc 4" },
+  ESTER: { c: "Arriesgó su vida ante el rey para salvar a su pueblo", r: "Est 4:16" },
+  RUTH: { c: "Le dijo a su suegra: tu pueblo será mi pueblo", r: "Rt 1:16" },
+  DALILA: { c: "Descubrió el secreto del cabello de un juez nazareo", r: "Jc 16" },
+  SANSON: { c: "Derribó el edificio de los filisteos con sus últimas fuerzas", r: "Jc 16:30" },
+  GOLIAT: { c: "Filisteo de casi tres metros que insultó al ejército de Israel", r: "1 S 17:4" },
+  TIMOTEO: { c: "Su mentor lo llamó verdadero hijo y le escribió dos cartas", r: "1 Ti 1:2" },
+  AARON: { c: "Su vara floreció y fue el primer sumo sacerdote del pueblo", r: "Ex 7:12" },
+  MIRIAM: { c: "Hermana mayor que danzó con panderos tras cruzar el mar", r: "Ex 15:20" },
+  ELISEO: { c: "Pidió el doble del espíritu de su maestro y heredó su manto", r: "2 R 2:9" },
+  ADAN: { c: "Recibió aliento de vida y fue puesto en un huerto", r: "Gn 2:7" },
+  EVA: { c: "Fue llamada madre de todos los vivientes", r: "Gn 3:20" },
+  CAIN: { c: "Su ofrenda no fue aceptada y mató a su hermano en el campo", r: "Gn 4:8" },
+  ABEL: { c: "Su sangre clamó desde la tierra", r: "Gn 4:10" },
+  LIDIA: { c: "Vendedora de púrpura que abrió su casa a los misioneros", r: "Hch 16:14-15" },
+  PRISCILA: { c: "Junto a su esposo instruyó con más precisión a un predicador elocuente", r: "Hch 18:26" },
+  NOEMI: { c: "Pidió que la llamaran Amarga por la pérdida de su familia", r: "Rt 1:20" },
+  ANA: { c: "Oró en Silo con lágrimas y prometió su hijo a Dios", r: "1 S 1:10-11" },
+  GEDEON: { c: "Venció con solo trescientos hombres que bebieron de rodillas", r: "Jc 7:5-7" },
+  JEFTE: { c: "Hizo un voto imprudente antes de pelear contra los amonitas", r: "Jc 11:30-31" },
+  MATIAS: { c: "Fue elegido por sorteo para ocupar el lugar del que traicionó", r: "Hch 1:26" },
+  APOLOS: { c: "Predicador elocuente al que explicaron mejor el camino de Dios", r: "Hch 18:24-26" },
+
+  // ─── LUGARES ───
+  EGIPTO: { c: "Allí el pueblo fue esclavo y allí cayeron diez señales", r: "Ex 1" },
+  CANAAN: { c: "La tierra prometida que fluye leche y miel", r: "Ex 3:8" },
+  JERICO: { c: "Sus murallas cayeron tras siete días de marchas y gritos", r: "Jos 6" },
+  BELEN: { c: "De este pueblo pequeño saldría el gobernante de Israel", r: "Mi 5:2" },
+  NAZARET: { c: "Allí creció el hijo del carpintero y no fue bien recibido", r: "Lc 4:16-29" },
+  JERUSALEN: { c: "Ciudad santa donde se levantó el gran santuario", r: "1 R 6:1" },
+  GALILEA: { c: "Región del lago donde comenzó la predicación del Maestro", r: "Mt 4:12-17" },
+  BABILONIA: { c: "Imperio que llevó cautivo al pueblo por setenta años", r: "2 R 25" },
+  ROMA: { c: "Los creyentes de allí recibieron la carta más doctrinal", r: "Rom 1:7" },
+  SINAI: { c: "Monte de fuego y truenos donde se entregaron dos tablas", r: "Ex 31:18" },
+  SION: { c: "Colina venerada que los peregrinos llamaban morada de Dios", r: "Sal 48:2" },
+  JORDAN: { c: "Sus aguas se abrieron para el pueblo y allí fue bautizado el Maestro", r: "Jos 3:16" },
+  JUDEA: { c: "Región sureña donde los profetas esperaban al Ungido", r: "Mi 5:2" },
+  SAMARIA: { c: "Allí una mujer junto al pozo recibió agua de vida", r: "Jn 4:7-14" },
+  CAPERNAUM: { c: "Pueblo de pescadores donde sanó a la suegra de Simón", r: "Mt 8:14" },
+  CANA: { c: "Allí faltó el líquido de la alegría en una boda", r: "Jn 2:1-11" },
+  GETSEMANI: { c: "Huerto de olivos donde oró hasta sudar como gotas de sangre", r: "Lc 22:44" },
+  GOLGOTA: { c: "Colina del cráneo donde fue levantado el madero", r: "Jn 19:17" },
+  BETANIA: { c: "Aldea de Marta y de Lázaro, cerca de la ciudad santa", r: "Jn 11:1" },
+  DAMASCO: { c: "Camino a esta ciudad Saulo cayó cegado por una luz", r: "Hch 9:3" },
+  ANTIOQUIA: { c: "Allí se llamó discípulos por primera vez a los seguidores del Maestro", r: "Hch 11:26" },
+  EFESO: { c: "Ciudad del templo de Artemisa donde Pablo provocó un gran alboroto", r: "Hch 19:28" },
+  CORINTO: { c: "Iglesia a la que se escribió el capítulo del amor", r: "1 Co 13" },
+  FILIPOS: { c: "Allí un carcelero creyó a medianoche y lavó las heridas de los presos", r: "Hch 16:25-33" },
+  TESALONICA: { c: "Recibió dos cartas sobre los que duermen y el día del Señor", r: "1 Ts 4:13-17" },
+  HEBRON: { c: "Allí fue ungido un rey por primera vez y reposan los patriarcas", r: "2 S 2:1" },
+  SICAR: { c: "Pozo heredado por un patriarca donde el Maestro se sentó cansado", r: "Jn 4:5-6" },
+  EMAUS: { c: "Aldea donde dos caminantes lo reconocieron al partir el pan", r: "Lc 24:30-31" },
+  BETEL: { c: "Allí un fugitivo soñó la escalera y levantó una columna", r: "Gn 28:19" },
+  ARARAT: { c: "Monte donde reposó la nave del diluvio", r: "Gn 8:4" },
+  MORIAH: { c: "Monte donde subió un padre con su hijo y la leña", r: "Gn 22:2" },
+  CARMELO: { c: "Monte donde un profeta desafió a cuatrocientos cincuenta rivales", r: "1 R 18:19-24" },
+  HOREB: { c: "Monte de Dios donde un profeta oyó un silbo apacible", r: "1 R 19:8-12" },
+
+  // ─── LIBROS ───
+  GENESIS: { c: "Abre la Biblia con la creación y los patriarcas", r: "Gn 1:1" },
+  EXODO: { c: "Narra las señales, la pascua y el cruce del mar", r: "Ex 12" },
+  LEVITICO: { c: "Reúne las leyes de los sacrificios y de la santidad", r: "Lv 16" },
+  NUMEROS: { c: "Cuenta los censos de las tribus y la travesía del desierto", r: "Nm 1" },
+  DEUTERONOMIO: { c: "Recoge los discursos finales de despedida antes de entrar a la tierra", r: "Dt 6:4" },
+  RUT: { c: "Relato de lealtad familiar en tiempos de los jueces", r: "Rt 1" },
+  SALMOS: { c: "Ciento cincuenta cantos de oración, alabanza y lamento", r: "Sal 23" },
+  PROVERBIOS: { c: "Sentencias breves para vivir con sabiduría; temer a Dios es el principio", r: "Pr 1:7" },
+  ECLESIASTES: { c: "Repite que todo es vanidad y vanidad de vanidades", r: "Ec 1:2" },
+  CANTARES: { c: "Poema nupcial lleno de imágenes del amor", r: "Ct 2" },
+  ISAIAS: { c: "Vio al Señor en un trono alto y anunció al Emanuel", r: "Is 6:1" },
+  JEREMIAS: { c: "Lloró por la ciudad y anunció un pacto nuevo escrito en el corazón", r: "Jr 31:31-33" },
+  EZEQUIEL: { c: "Vio un valle de huesos secos que volvieron a vivir", r: "Ez 37:1-14" },
+  DANIEL: { c: "Fue librado de las fieras en el foso y recibió sueños de imperios", r: "Dn 6" },
+  OSEAS: { c: "Amó a una mujer infiel como señal del amor de Dios a su pueblo", r: "Os 1:2" },
+  JOEL: { c: "Anunció que los jóvenes verían visiones y los ancianos soñarían sueños", r: "Jl 2:28" },
+  AMOS: { c: "Pastor de Tecoa que denunció la injusticia en el reino del norte", r: "Am 1:1" },
+  ABDIAS: { c: "El más breve del Antiguo Testamento, anunció juicio sobre Edom", r: "Abd 1" },
+  MIQUEAS: { c: "Anunció que de un pueblo pequeño saldría el gobernante", r: "Mi 5:2" },
+  NAHUM: { c: "Anunció la caída de Nínive, la ciudad sanguinaria", r: "Nah 1:1" },
+  HABACUC: { c: "Preguntó a Dios por qué toleraba la violencia", r: "Hab 1:2-3" },
+  SOFONIAS: { c: "Habló del gran día de Dios y del resto humilde del pueblo", r: "Sof 2:3" },
+  HAGEO: { c: "Animó al pueblo a reedificar la casa de Dios tras el cautiverio", r: "Hag 1:8" },
+  ZACARIAS: { c: "Vio caballos, cuernos y un candelabro de oro en sus visiones", r: "Zac 1:8" },
+  MALAQUIAS: { c: "Cierra el Antiguo Testamento con un llamado a volver", r: "Mal 3:7" },
+  MATEO: { c: "Su relato abre el Nuevo Testamento con una genealogía", r: "Mt 1:1" },
+  MARCOS: { c: "El más breve de los cuatro relatos, ágil y directo", r: "Mc 1:1" },
+  LUCAS: { c: "Médico que escribió el relato más detallado del nacimiento", r: "Lc 1:1-4" },
+  HECHOS: { c: "Narra las lenguas de fuego y los viajes de los primeros misioneros", r: "Hch 2" },
+  ROMANOS: { c: "La exposición más completa sobre la justificación por la confianza en Dios", r: "Rom 3:24" },
+  GALATAS: { c: "Carta que defiende la libertad frente al yugo de la ley", r: "Ga 5:1" },
+  EFESIOS: { c: "Habla de la armadura completa y del misterio ahora revelado", r: "Ef 6:11" },
+  FILIPENSES: { c: "Escrita desde la prisión y rebosa de gozo: regocijaos siempre", r: "Fil 4:4" },
+  COLOSENSES: { c: "Exalta la supremacía del Maestro sobre toda la creación", r: "Col 1:15-18" },
+  HEBREOS: { c: "Presenta al Maestro como sumo sacerdote superior a los antiguos", r: "Heb 4:14" },
+  SANTIAGO: { c: "Carta que afirma que la confianza sin obras está muerta", r: "Stg 2:17" },
+  APOCALIPSIS: { c: "El último libro, lleno de visiones, sellos y símbolos", r: "Ap 1:1" },
+  JUECES: { c: "Relata a Débora, a Gedeón y al hombre de gran fuerza", r: "Jc 2:16" },
+  JOB: { c: "Sufrió sin causa y se mantuvo fiel entre cenizas y preguntas", r: "Job 1:20-22" },
+
+  // ─── COSAS, EVENTOS, VALORES ───
+  ARCA: { c: "Caja de acacia para las tablas, y también la nave de madera de gofer", r: "Gn 6:14" },
+  CRUZ: { c: "Instrumento de madera donde se cumplió la redención", r: "Lc 23:33" },
+  TABLAS: { c: "Dos piedras escritas por el dedo de Dios y rotas al pie del monte", r: "Ex 31:18" },
+  TROMPETAS: { c: "Siete sacerdotes las soplaron alrededor de una ciudad", r: "Jos 6:4" },
+  CORDERO: { c: "Figura del sacrificio pascual y del inocente llevado al matadero", r: "Is 53:7" },
+  LAMPARA: { c: "Alumbra los pies del que camina según la palabra de Dios", r: "Sal 119:105" },
+  VARA: { c: "Se convirtió en serpiente ante el faraón y abrió el mar", r: "Ex 7:10-12" },
+  VINO: { c: "Faltó en una boda y fue el primer milagro", r: "Jn 2:3-9" },
+  MANA: { c: "Pan blanco que aparecía con el rocío cada amanecer en el desierto", r: "Ex 16:14-15" },
+  MIEL: { c: "Dulce don de la tierra prometida, mencionado junto a la leche", r: "Ex 3:8" },
+  LEON: { c: "Ruge buscando su presa, y así se describe al enemigo que acecha", r: "1 P 5:8" },
+  ASNO: { c: "Bestia que habló y reprendió a un profeta en el camino", r: "Nm 22:28" },
+  SERPIENTE: { c: "Se arrastra desde el huerto y fue levantada en un asta en el desierto", r: "Nm 21:9" },
+  PALOMA: { c: "Volvió con una hoja verde a la nave que flotaba", r: "Gn 8:11" },
+  LOBO: { c: "Se disfraza de oveja en los profetas que vienen con engaño", r: "Mt 7:15" },
+  DRAGON: { c: "Bestia de siete cabezas y diez cuernos del último libro", r: "Ap 12:3" },
+  AGUILA: { c: "Renueva sus fuerzas y sube con alas, según el profeta", r: "Is 40:31" },
+  FE: { c: "Sin ella es imposible agradar a Dios; es certeza de lo que no se ve", r: "Heb 11:1" },
+  ESPERANZA: { c: "Es ancla del alma, firme y segura, junto al amor y la confianza", r: "Heb 6:19" },
+  AMOR: { c: "El mayor de los tres que permanecen; nunca deja de ser", r: "1 Co 13:13" },
+  GRACIA: { c: "Don inmerecido que salva; no viene de obras para que nadie se gloríe", r: "Ef 2:8-9" },
+  PAZ: { c: "El Maestro la deja como herencia, pero no como el mundo la da", r: "Jn 14:27" },
+  SABIDURIA: { c: "Quien la halla, halla la vida; se busca como tesoro escondido", r: "Pr 3:13-14" },
+  LUZ: { c: "Lo primero que Dios llamó a existir antes de separar el día", r: "Gn 1:3" },
+  VERDAD: { c: "El que la conoce queda libre de la mentira", r: "Jn 8:32" },
+  GOZO: { c: "Fruto del Espíritu que sigue al amor y precede a la tranquilidad", r: "Ga 5:22" },
+  PACIENCIA: { c: "Fruto del Espíritu que soporta sin desesperar", r: "Ga 5:22" },
+  BONDAD: { c: "Fruto del Espíritu que hace el bien sin esperar recompensa", r: "Ga 5:22" },
+  MANSEDUMBRE: { c: "Fruto del Espíritu que responde con suavidad", r: "Ga 5:23" },
+  TEMPLANZA: { c: "Dominio propio, el último de la lista de los frutos", r: "Ga 5:23" },
+  JUSTICIA: { c: "Corre como un río que no se detiene, pide el profeta", r: "Am 5:24" },
+  MISERICORDIA: { c: "Se alegra contra el juicio y triunfa sobre él", r: "Stg 2:13" },
+  PERDON: { c: "Setenta veces siete fue la cifra que dio el Maestro", r: "Mt 18:22" },
+  AYUNO: { c: "Cuarenta días y cuarenta noches sin probar bocado en el desierto", r: "Mt 4:2" },
+  DILUVIO: { c: "Cuarenta días y cuarenta noches de lluvia sobre la tierra", r: "Gn 7:12" },
+  PASCUA: { c: "Fiesta de liberación con sangre en el dintel de la puerta", r: "Ex 12:13" },
+  BABEL: { c: "Ciudad donde se confundieron las lenguas de los constructores", r: "Gn 11:7-9" },
+  EDEN: { c: "Huerto del principio con árboles hermosos y un río que lo regaba", r: "Gn 2:8-10" },
+  ANGEL: { c: "Anunció a los pastores que había nacido el Salvador", r: "Lc 2:9-11" },
+  SATANAS: { c: "Tentó en el desierto y es llamado el acusador de los hermanos", r: "Mt 4:1" },
+  CIELO: { c: "Allí está el trono, y allí pide el Maestro que se haga la voluntad de Dios", r: "Mt 6:9-10" },
+  ISRAEL: { c: "Nombre recibido tras luchar toda la noche con un varón", r: "Gn 32:28" },
+  PENTECOSTES: { c: "Fiesta en la que aparecieron lenguas de fuego sobre los reunidos", r: "Hch 2:1-4" },
+  RESURRECCION: { c: "Al tercer día el sepulcro quedó vacío y la piedra removida", r: "Jn 11:25" },
+  MESIAS: { c: "El Ungido esperado durante siglos, anunciado por los profetas", r: "Dn 9:25" },
+  TEMPLO: { c: "Casa de oración que fue limpiada de mercaderes y cambistas", r: "Jn 2:14-16" },
+  PARABOLA: { c: "Relato breve como el del sembrador o el del hijo pródigo", r: "Mt 13:3" },
+  BAUTISMO: { c: "Señal en el río que representa morir y resucitar con el Maestro", r: "Mt 3:13-16" },
+  EVANGELIO: { c: "Buena noticia; hay cuatro relatos con este nombre", r: "Mc 1:1" },
+  PACTO: { c: "Alianza sellada con un arco en las nubes y luego con sangre", r: "Gn 9:13" },
+  DIEZMO: { c: "La décima parte que se consagra y se lleva al alfolí", r: "Mal 3:10" },
+  REPOSO: { c: "Dios lo estableció el séptimo día tras terminar su obra", r: "Gn 2:2-3" },
+  SEMILLA: { c: "Cae en cuatro tipos de terreno en la historia del sembrador", r: "Mt 13:3-8" },
+  REDIL: { c: "Corral con una sola entrada por donde pasa el buen pastor", r: "Jn 10:1-9" },
+  OVEJA: { c: "Noventa y nueve quedaron mientras se buscaba a la descarriada", r: "Lc 15:4-7" },
+  PASTOR: { c: "Da su vida por las ovejas y conoce a cada una por su nombre", r: "Jn 10:11-14" },
+  SIERVO: { c: "El que es fiel en lo poco entra al gozo de su señor", r: "Mt 25:21" },
+  PROFETA: { c: "Habla en nombre de Dios; Moisés anunció que uno como él vendría", r: "Dt 18:18" },
+  SACERDOTE: { c: "Intercede por el pueblo y ofrece sacrificios por los pecados", r: "Lv 21" },
+  ALTAR: { c: "Lugar del sacrificio, hecho de piedras sin labrar", r: "Ex 20:25" },
+  INCIENSO: { c: "Aroma que sube junto con la oración de los santos", r: "Sal 141:2" },
+  ACEITE: { c: "Las prudentes lo guardaban de sobra para sus lámparas", r: "Mt 25:3-4" },
+  TRIGO: { c: "Se separa de la mala hierba en el tiempo de la siega", r: "Mt 13:30" },
+  HIGUERA: { c: "El Maestro buscó fruto en ella y solo halló hojas", r: "Lc 13:6-7" },
+  OLIVO: { c: "Árbol del huerto de la oración y del aceite de la unción", r: "Lc 22:39" },
+  ROCA: { c: "Sobre ella se edifica la casa que no cae cuando viene el río", r: "Mt 7:24-25" },
+  ARENA: { c: "Terreno donde construyó el necio y su casa cayó", r: "Mt 7:26-27" },
+  PUERTA: { c: "El Maestro dijo: yo soy la; el que por mí entre será salvo", r: "Jn 10:9" },
+  CAMINO: { c: "El Maestro dijo: yo soy el, y la verdad, y la vida", r: "Jn 14:6" },
+  BARCO: { c: "Allí dormía el Maestro sobre un cabezal durante la tempestad", r: "Mc 4:37-38" },
+  TORMENTA: { c: "Se detuvo con una orden: calla, enmudece", r: "Mc 4:39" },
+  PANES: { c: "Cinco de ellos, con dos peces, alimentaron a una multitud", r: "Mt 14:17-21" },
+  PECES: { c: "Dos de ellos acompañaron a los panes en el milagro junto al lago", r: "Mt 14:17" },
+  POZO: { c: "Allí se ofreció agua que salta para vida eterna", r: "Jn 4:6-14" },
+  DENARIO: { c: "Moneda que valía el jornal de un día de trabajo", r: "Mt 20:2" },
+  TALENTO: { c: "Se repartió en cinco, dos y uno antes de un largo viaje", r: "Mt 25:15" },
+  CORONA: { c: "De espinas, fue puesta sobre la frente del Rey de los judíos", r: "Mt 27:29" },
+  LANZA: { c: "Traspasó el costado y salió sangre y agua", r: "Jn 19:34" },
+  CLAVOS: { c: "Sujetaron manos y pies al madero, y el discípulo dudó de ellos", r: "Jn 20:25" },
+  SUDARIO: { c: "Lienzo doblado y puesto aparte en el sepulcro vacío", r: "Jn 20:7" },
+  TUNICA: { c: "Sin costura, fue rifada entre los soldados al pie del madero", r: "Jn 19:23-24" },
+  SANDALIAS: { c: "El que bautizaba dijo no ser digno de desatar sus correas", r: "Mc 1:7" },
+  SEPULCRO: { c: "Cueva nueva sellada con una gran piedra que fue removida", r: "Mt 27:60" },
+  PIEDRA: { c: "La que desecharon los edificadores fue puesta por cabeza del ángulo", r: "Sal 118:22" },
+  ESCALERA: { c: "Subía del suelo al cielo en el sueño de un fugitivo", r: "Gn 28:12" },
+  ZARZA: { c: "Ardía sin consumirse cuando habló desde el fuego", r: "Ex 3:2" },
+  PLAGAS: { c: "Diez señales que doblegaron el corazón del faraón", r: "Ex 7-12" },
+  MURALLA: { c: "Rodeaba la ciudad que cayó al séptimo día", r: "Jos 6:20" },
+  GIGANTE: { c: "Uno solo bastó para llenar de miedo a todo un ejército", r: "1 S 17:4-11" },
+  HONDA: { c: "Arma sencilla con la que cayó el enemigo de casi tres metros", r: "1 S 17:49" }
+};
+
+/* ================= GENERADOR DE PUZZLE ================= */
+function shuffle(a){ for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+
+function build(pool, target){
+  const cells = new Map();
+  const words = [];
+  const get = (r,c) => cells.get(r+','+c);
+  const set = (r,c,v) => cells.set(r+','+c, v);
+  const B = 60;
+
+  function place(word, r, c, h){
+    const L = word.length;
+    for(let i=0;i<L;i++){
+      const rr = h ? r : r+i, cc = h ? c+i : c;
+      if(rr<-B||rr>B||cc<-B||cc>B) return false;
+      const cur = get(rr,cc);
+      if(cur!==undefined && cur!==word[i]) return false;
+      if(cur===undefined){
+        if(h){ if(get(rr-1,cc)!==undefined || get(rr+1,cc)!==undefined) return false; }
+        else { if(get(rr,cc-1)!==undefined || get(rr,cc+1)!==undefined) return false; }
+      }
+    }
+    const br = h ? r : r-1, bc = h ? c-1 : c;
+    const ar = h ? r : r+L, ac = h ? c+L : c;
+    if(get(br,bc)!==undefined || get(ar,ac)!==undefined) return false;
+    for(let i=0;i<L;i++){
+      const rr = h ? r : r+i, cc = h ? c+i : c;
+      set(rr,cc,word[i]);
+    }
+    words.push({word, r, c, h});
+    return true;
+  }
+
+  // Primera palabra: orientación y posición aleatoria cerca del centro
+  const first = pool[0];
+  const h0 = Math.random() < 0.5;
+  const dr = Math.floor(Math.random()*5)-2;
+  const dc = Math.floor(Math.random()*5)-2;
+  if(!place(first, dr, dc, h0)) return null;
+
+  for(const w of pool.slice(1)){
+    if(words.length >= target) break;
+    // Candidates where `w` crosses an already-placed word
+    const cands = [];
+    for(const p of words){
+      for(let j=0;j<p.word.length;j++){
+        for(let i=0;i<w.length;i++){
+          if(w[i]!==p.word[j]) continue;
+          if(p.h){ cands.push({ r: p.r - i, c: p.c + j, h:false }); }
+          else   { cands.push({ r: p.r + j, c: p.c - i, h:true }); }
+        }
+      }
+    }
+    shuffle(cands);
+    for(const cd of cands){
+      if(place(w, cd.r, cd.c, cd.h)) break;
+    }
+  }
+  if(words.length < 7) return null;
+
+  // Aplanar a coordenadas positivas
+  let minR=Infinity,maxR=-Infinity,minC=Infinity,maxC=-Infinity;
+  for(const k of cells.keys()){
+    const [r,c]=k.split(',').map(Number);
+    if(r<minR)minR=r; if(r>maxR)maxR=r;
+    if(c<minC)minC=c; if(c>maxC)maxC=c;
+  }
+  const rows=maxR-minR+1, cols=maxC-minC+1;
+  const board = Array.from({length:rows},()=>Array(cols).fill(null));
+  for(const [k,v] of cells){
+    const [r,c]=k.split(',').map(Number);
+    board[r-minR][c-minC]=v;
+  }
+  const placed = words.map(w=>({...w, r:w.r-minR, c:w.c-minC}));
+  return { board, rows, cols, words: placed };
+}
+
+function generate(){
+  let best = null;
+  for(let att=0; att<120; att++){
+    const target = 8 + Math.floor(Math.random()*5); // 8 a 12 palabras
+    const res = build(shuffle(Object.keys(WORDS)), target);
+    if(!res) continue;
+    if(!best || res.words.length > best.words.length) best = res;
+    if(best && best.words.length >= target) break;
+  }
+  if(!best){ // último recurso: forzar un intento pequeño
+    best = build(shuffle(Object.keys(WORDS)), 7);
+  }
+  return best;
+}
+
+function numberWords(words){
+  // Numeración tipo tabloide: orden fila→columna
+  const starts = words.map(w=>({ r:w.r, c:w.c, h:w.h }));
+  starts.sort((a,b)=> a.r-b.r || a.c-b.c);
+  let n = 0, prevR = -1, prevC = -1;
+  for(const s of starts){
+    if(s.r!==prevR || s.c!==prevC){ n++; prevR=s.r; prevC=s.c; }
+    s.n = n;
+  }
+  return starts;
+}
+
+/* ================= ESTADO ================= */
+let puzzle = null;
+let answers = [];       // lo que escribió el usuario
+let selected = null;    // {r,c}
+let direction = 'h';    // 'h' | 'v'
+let solved = false;
+let hintsUsed = 0;
+let startTime = null;
+let timerId = null;
+let eraser = false;
+
+const $ = id => document.getElementById(id);
+const boardEl = $('board');
+
+/* ================= RENDER ================= */
+function render(){
+  boardEl.innerHTML = '';
+  const numMap = {};
+  for(const s of numberWords(puzzle.words)) numMap[s.r+','+s.c] = s.n;
+
+  boardEl.style.gridTemplateColumns = `repeat(${puzzle.cols}, 1fr)`;
+  answers = Array.from({length:puzzle.rows},()=>Array(puzzle.cols).fill(''));
+
+  for(let r=0;r<puzzle.rows;r++){
+    for(let c=0;c<puzzle.cols;c++){
+      if(!puzzle.board[r][c]){
+        const gap = document.createElement('div');
+        gap.className = 'cell empty';
+        boardEl.appendChild(gap);
+        continue;
+      }
+      const cell = document.createElement('div');
+      cell.className = 'cell';
+      cell.dataset.r = r; cell.dataset.c = c;
+      if(numMap[r+','+c]) {
+        const s = document.createElement('span');
+        s.className='num'; s.textContent = numMap[r+','+c];
+        cell.appendChild(s);
+      }
+      const inp = document.createElement('input');
+      inp.maxLength = 1;
+      inp.autocapitalize = 'characters';
+      inp.autocomplete = 'off';
+      inp.spellcheck = false;
+      inp.setAttribute('aria-label', `casilla ${r},${c}`);
+      cell.appendChild(inp);
+      boardEl.appendChild(cell);
+
+      inp.addEventListener('focus', ()=>{ select(r,c); });
+      inp.addEventListener('input', ()=> onKey(r,c,inp));
+      inp.addEventListener('keydown', e => onArrow(e,r,c,inp));
+      inp.addEventListener('click', ()=>{ select(r,c); if(eraser) clearCell(r,c); inp.focus(); });
+    }
+  }
+
+  // Pistas
+  const acc = $('across'), dow = $('down');
+  acc.innerHTML = ''; dow.innerHTML = '';
+  const starts = numberWords(puzzle.words);
+  for(const s of starts){
+    const w = puzzle.words.find(w=>w.r===s.r && w.c===s.c && w.h===s.h);
+    const div = document.createElement('div');
+    div.className = 'clue';
+    div.id = 'clue-'+(s.h?'A':'D')+'-'+s.n;
+    const info = WORDS[w.word];
+    div.innerHTML = `<span class="n">${s.n}.</span> <span class="txt">${info.c}</span> <span class="len">(${w.word.length})</span> <span class="ref">· ${info.r}</span>`;
+    div.addEventListener('click', ()=>{
+      if(solved) return;
+      direction = s.h ? 'h' : 'v';
+      select(s.r, s.c);
+      focusCell(s.r, s.c);
+    });
+    (s.h?acc:dow).appendChild(div);
+  }
+  updateProgress();
+}
+
+function select(r,c){
+  if(solved) return;
+  if(selected){
+    const prev = document.querySelector(`.cell[data-r="${selected.r}"][data-c="${selected.c}"]`);
+    if(prev) prev.classList.remove('selected');
+  }
+  selected = {r,c};
+  const cell = document.querySelector(`.cell[data-r="${r}"][data-c="${c}"]`);
+  // Orientación: si la casilla solo pertenece a una dirección, fijarla
+  const inH = puzzle.words.some(w=>w.h && w.r===r && c>=w.c && c<w.c+w.word.length);
+  const inV = puzzle.words.some(w=>!w.h && w.c===c && r>=w.r && r<w.r+w.word.length);
+  if(inH && !inV) direction='h';
+  else if(inV && !inH) direction='v';
+  cell.classList.add('selected');
+  highlightWord();
+  updateMode();
+}
+
+function wordAt(r,c,h){
+  // Devuelve la ÚNICA palabra que contiene la casilla (r,c) en la dirección h.
+  // Si hay varias (diseño de líneas paralelas) devuelve la más cercana al inicio.
+  const list = puzzle.words.filter(w=>{
+    if(h) return w.h && w.r===r && c>=w.c && c<w.c+w.word.length;
+    return !w.h && w.c===c && r>=w.r && r<w.r+w.word.length;
+  });
+  if(list.length<=1) return list[0]||null;
+  list.sort((a,b)=> (h? a.c-b.c : a.r-b.r));
+  return list[0];
+}
+
+function highlightWord(){
+  document.querySelectorAll('.cell').forEach(el=>el.classList.remove('active-word'));
+  document.querySelectorAll('.clue').forEach(el=>el.classList.remove('active'));
+  if(!selected) return;
+  const w = wordAt(selected.r, selected.c, direction==='h');
+  if(!w) return;
+  for(let i=0;i<w.word.length;i++){
+    const rr = w.h ? w.r : w.r+i;
+    const cc = w.h ? w.c+i : w.c;
+    const el = document.querySelector(`.cell[data-r="${rr}"][data-c="${cc}"]`);
+    if(el) el.classList.add('active-word');
+  }
+  const start = numberWords(puzzle.words).find(x=>x.r===w.r && x.c===w.c && x.h===w.h);
+  const cl = document.getElementById('clue-'+(w.h?'A':'D')+'-'+start.n);
+  if(cl) cl.classList.add('active');
+}
+
+function nextCell(r,c,dr,dc){
+  let rr=r+dr, cc=c+dc;
+  while(rr>=0 && rr<puzzle.rows && cc>=0 && cc<puzzle.cols){
+    if(puzzle.board[rr][cc]) return {r:rr,c:cc};
+    rr+=dr; cc+=dc;
+  }
+  return null;
+}
+
+function focusCell(r,c){
+  const inp = document.querySelector(`.cell[data-r="${r}"][data-c="${c}"] input`);
+  if(!inp) return;
+  inp.focus();
+  // Mantener la casilla visible (importante en móvil con teclado abierto)
+  const cell = document.querySelector(`.cell[data-r="${r}"][data-c="${c}"]`);
+  if(cell) cell.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'smooth' });
+}
+
+function updateMode(){
+  const m = $('mode');
+  if(m) m.textContent = (direction==='h' ? '↔ Horizontales' : '↕ Verticales') + (eraser ? ' · 🧹 borrador' : '');
+}
+
+function currentWord(){
+  if(!selected) return null;
+  return wordAt(selected.r, selected.c, direction==='h');
+}
+
+function clearCell(r,c){
+  const inp = document.querySelector(`.cell[data-r="${r}"][data-c="${c}"] input`);
+  if(!inp || inp.readOnly) return;
+  answers[r][c] = '';
+  inp.value = '';
+  updateProgress();
+}
+
+function clearLine(){
+  const w = currentWord();
+  if(!w) return;
+  for(let i=0;i<w.word.length;i++){
+    const rr = w.h?w.r:w.r+i, cc = w.h?w.c+i:w.c;
+    const inp = document.querySelector(`.cell[data-r="${rr}"][data-c="${cc}"] input`);
+    if(inp && inp.readOnly) continue;
+    answers[rr][cc] = '';
+    if(inp) inp.value = '';
+  }
+  if(!startTime) startTimer();
+  updateProgress();
+}
+
+function onArrow(e,r,c,inp){
+  if(solved) return;
+  if(e.key.startsWith('Arrow')){
+    const map = { ArrowRight:[0,1,'h'], ArrowLeft:[0,-1,'h'], ArrowDown:[1,0,'v'], ArrowUp:[-1,0,'v'] };
+    const m = map[e.key];
+    if(!m) return;
+    e.preventDefault();
+    direction = m[2];
+    const t = nextCell(r,c,m[0],m[1]);
+    if(t) focusCell(t.r,t.c);
+    updateMode();
+  }
+  else if(e.key===' '){
+    // Alternar ↔ / ↕ (solo si la casilla pertenece a ambas palabras)
+    e.preventDefault();
+    const inH = puzzle.words.some(w=>w.h && w.r===r && c>=w.c && c<w.c+w.word.length);
+    const inV = puzzle.words.some(w=>!w.h && w.c===c && r>=w.r && r<w.r+w.word.length);
+    if(inH && inV){ direction = direction==='h' ? 'v' : 'h'; highlightWord(); updateMode(); }
+  }
+  else if(e.key==='Backspace' || e.key==='Delete'){
+    e.preventDefault();
+    if(e.shiftKey){ clearLine(); return; }          // borrar TODA la línea activa
+    if(eraser){ clearCell(r,c); return; }           // modo borrador: limpiar esta casilla
+    if(answers[r][c]){                              // hay letra: borrar y quedarse
+      answers[r][c]=''; inp.value=''; updateProgress();
+    } else {                                        // vacía: retroceder y borrar la anterior
+      const p = nextCell(r,c, direction==='h'?0:-1, direction==='h'?-1:0);
+      if(p){ focusCell(p.r,p.c); clearCell(p.r,p.c); }
+    }
+  }
+}
+
+function onKey(r,c,inp){
+  if(solved) return;
+  let v = inp.value.toUpperCase();
+  if(v && !/^[A-Z]$/.test(v)){ inp.value=''; v=''; return; }
+  if(!startTime) startTimer();
+  answers[r][c] = v;
+  inp.value = v;
+  highlightWord();
+  updateProgress();
+  if(checkSolved()) return;
+  // Avanzar automáticamente
+  const dr = direction==='h'?0:1, dc = direction==='h'?1:0;
+  const nxt = nextCell(r,c,dr,dc);
+  if(nxt) focusCell(nxt.r,nxt.c);
+}
+
+/* ================= PROGRESO / TIMER ================= */
+function startTimer(){
+  startTime = Date.now();
+  timerId = setInterval(()=>{
+    const s = Math.floor((Date.now()-startTime)/1000);
+    $('time').textContent = String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0');
+  },500);
+}
+
+function wordDone(w){
+  for(let i=0;i<w.word.length;i++){
+    const rr = w.h?w.r:w.r+i, cc = w.h?w.c+i:w.c;
+    if(answers[rr][cc]!==puzzle.board[rr][cc]) return false;
+  }
+  return true;
+}
+
+function updateProgress(){
+  const done = puzzle.words.filter(wordDone).length;
+  $('progress').textContent = `${done}/${puzzle.words.length}`;
+  for(const w of puzzle.words){
+    const s = puzzle.words; // buscar número
+    const start = numberWords(s).find(x=>x.r===w.r && x.c===w.c && x.h===w.h);
+    const el = document.getElementById('clue-'+(w.h?'A':'D')+'-'+start.n);
+    if(el) el.classList.toggle('done', wordDone(w));
+  }
+}
+
+function checkSolved(){
+  for(const w of puzzle.words){
+    if(!wordDone(w)) return false;
+  }
+  solved = true;
+  if(timerId) clearInterval(timerId);
+  setTimeout(()=>{
+    showModal('🎉','¡Crucigrama completado! 🎉',
+      `Terminaste en <b>${$('time').textContent}</b> usando <b>${hintsUsed}</b> pista(s). ¡Dios te bendiga! 🙌`);
+    confetti();
+  },350);
+  return true;
+}
+
+/* ================= BOTONES ================= */
+$('btnNew').addEventListener('click', ()=> newGame());
+$('mBtn').addEventListener('click', ()=> newGame());
+
+$('btnCheck').addEventListener('click', ()=>{
+  if(!puzzle || solved) return;
+  let errors = 0;
+  for(let r=0;r<puzzle.rows;r++)for(let c=0;c<puzzle.cols;c++){
+    if(!puzzle.board[r][c]) continue;
+    const el = document.querySelector(`.cell[data-r="${r}"][data-c="${c}"]`);
+    if(answers[r][c] && answers[r][c]!==puzzle.board[r][c]){
+      errors++;
+      el.classList.add('wrong');
+      setTimeout(()=>el.classList.remove('wrong'),1200);
+    }
+  }
+  flash(errors===0 ? 'Todo lo escrito está bien ✔️' : `Hay ${errors} letra(s) incorrecta(s). ¡Sigue intentando!`);
+});
+
+$('btnHint').addEventListener('click', ()=>{
+  if(!puzzle || solved) return;
+  const candidates=[];
+  for(let r=0;r<puzzle.rows;r++)for(let c=0;c<puzzle.cols;c++){
+    if(puzzle.board[r][c] && answers[r][c]!==puzzle.board[r][c]) candidates.push({r,c});
+  }
+  if(!candidates.length) return;
+  const pick = candidates[Math.floor(Math.random()*candidates.length)];
+  const inp = document.querySelector(`.cell[data-r="${pick.r}"][data-c="${pick.c}"] input`);
+  answers[pick.r][pick.c] = puzzle.board[pick.r][pick.c];
+  inp.value = answers[pick.r][pick.c];
+  inp.readOnly = true;
+  document.querySelector(`.cell[data-r="${pick.r}"][data-c="${pick.c}"]`).classList.add('hinted');
+  hintsUsed++;
+  $('hints').textContent = hintsUsed;
+  if(!startTime) startTimer();
+  updateProgress();
+  checkSolved();
+});
+
+$('btnReveal').addEventListener('click', ()=>{
+  if(!puzzle || solved) return;
+  for(let r=0;r<puzzle.rows;r++)for(let c=0;c<puzzle.cols;c++){
+    if(!puzzle.board[r][c]) continue;
+    answers[r][c]=puzzle.board[r][c];
+    const inp = document.querySelector(`.cell[data-r="${r}"][data-c="${c}"] input`);
+    inp.value = puzzle.board[r][c];
+    inp.readOnly = true;
+  }
+  solved = true;
+  if(timerId) clearInterval(timerId);
+  updateProgress();
+  showModal('👁️','Crucigrama revelado','Revisa las soluciones y arma otro: ¡hay infinitas combinaciones!');
+});
+
+$('btnDir').addEventListener('click', ()=>{
+  if(!puzzle || solved || !selected) return;
+  const r=selected.r, c=selected.c;
+  const inH = puzzle.words.some(w=>w.h && w.r===r && c>=w.c && c<w.c+w.word.length);
+  const inV = puzzle.words.some(w=>!w.h && w.c===c && r>=w.r && r<w.r+w.word.length);
+  if(inH && inV){ direction = direction==='h' ? 'v' : 'h'; highlightWord(); updateMode(); }
+});
+
+$('btnErase').addEventListener('click', ()=>{
+  eraser = !eraser;
+  document.body.classList.toggle('erasing', eraser);
+  const b = $('btnErase');
+  b.classList.toggle('eraser-on', eraser);
+  b.textContent = eraser ? '🧹 Borrador: ON' : '🧹 Borrador';
+  updateMode();
+});
+
+function flash(msg){
+  const tip = document.querySelector('.tip');
+  const old = tip.textContent;
+  tip.style.color = '#fcd34d';
+  tip.textContent = msg;
+  setTimeout(()=>{ tip.style.color=''; tip.textContent = old; }, 2200);
+}
+
+function newGame(){
+  $('overlay').classList.remove('show');
+  document.querySelectorAll('.clue').forEach(el=>el.classList.remove('done'));
+  hintsUsed = 0;
+  $('hints').textContent = '0';
+  $('time').textContent = '00:00';
+  if(timerId) clearInterval(timerId);
+  startTime = null;
+  solved = false;
+  selected = null;
+  direction = 'h';
+  eraser = false;
+  document.body.classList.remove('erasing');
+  const eb = $('btnErase');
+  eb.classList.remove('eraser-on');
+  eb.textContent = '🧹 Borrador';
+  puzzle = generate();
+  render();
+}
+
+/* ================= MODAL + CONFETI ================= */
+function showModal(icon,title,text){
+  $('mIcon').textContent = icon;
+  $('mTitle').innerHTML = title;
+  $('mText').innerHTML = text;
+  $('overlay').classList.add('show');
+}
+
+function confetti(){
+  const cv = $('confetti');
+  const ctx = cv.getContext('2d');
+  cv.width = innerWidth; cv.height = innerHeight;
+  const colors = ['#fcd34d','#f59e0b','#f87171','#60a5fa','#4ade80','#c084fc','#ffffff'];
+  const parts = Array.from({length:180},()=>({
+    x: Math.random()*cv.width,
+    y: -20 - Math.random()*cv.height*0.5,
+    w: 6+Math.random()*8,
+    h: 8+Math.random()*10,
+    vy: 2+Math.random()*3.5,
+    vx: -1.5+Math.random()*3,
+    rot: Math.random()*Math.PI,
+    vr: -0.15+Math.random()*0.3,
+    color: colors[Math.floor(Math.random()*colors.length)]
+  }));
+  let t = 0;
+  (function frame(){
+    t++;
+    ctx.clearRect(0,0,cv.width,cv.height);
+    for(const p of parts){
+      p.y += p.vy; p.x += p.vx; p.rot += p.vr;
+      ctx.save();
+      ctx.translate(p.x,p.y);
+      ctx.rotate(p.rot);
+      ctx.fillStyle = p.color;
+      ctx.fillRect(-p.w/2,-p.h/2,p.w,p.h);
+      ctx.restore();
+    }
+    if(t < 260) requestAnimationFrame(frame);
+    else ctx.clearRect(0,0,cv.width,cv.height);
+  })();
+}
+
+/* ================= ARRANQUE ================= */
+newGame();
+</script>
+</body>
+</html>
